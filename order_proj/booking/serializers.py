@@ -49,11 +49,7 @@ class BookingSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Booking duration exceeds limit.")
 
         if (end_time - start_time).total_seconds() < 60 * 60:  # 60 minutes
-<<<<<<< HEAD
-            raise serializers.ValidationError("Can be booked for a minimum of 30 minutes.")
-=======
             raise serializers.ValidationError("Can be booked for a minimum of 1 hour.")
->>>>>>> a23593b (Address all identified issues)
 
         return data
 
