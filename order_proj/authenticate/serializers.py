@@ -76,6 +76,31 @@ class RegisterSerializer(serializers.ModelSerializer):
         return user
 
 
+class ChangePasswordSerializer(serializers.Serializer):
+    old_password = serializers.CharField(required=True)
+    new_password = serializers.CharField(required=True)
+
+    def validate_old_password(self, value):
+        user = self.context['request'].user
+        if not user.check_password(value):
+            raise serializers.ValidationError("Invalid old password")
+        return value
+
+    def validate_new_password(self, value):
+        validate_password(value)
+        return value
+
+    def create(self, validated_data):
+        user = self.context['request'].user
+        old_password = validated_data['old_password']
+        new_password = validated_data['new_password']
+        if old_password == new_password:
+            raise serializers.ValidationError("New password should be different from the old one.")
+        user.set_password(new_password)
+        user.save()
+        return user
+
+
 class ProfileSerializer(serializers.ModelSerializer):
 
     class Meta:
