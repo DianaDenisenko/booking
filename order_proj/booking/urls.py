@@ -13,7 +13,7 @@ from .views import (
 )
 
 
-router = SimpleRouter()
+router = SimpleRouter(trailing_slash=False)
 router.register('offices', OfficeViewSet, basename='office')
 router.register('rooms', RoomViewSet, basename='room')
 router.register('seats', SeatViewSet, basename='seat')
