@@ -79,6 +79,7 @@ class RegisterSerializer(serializers.ModelSerializer):
 class ChangePasswordSerializer(serializers.Serializer):
     old_password = serializers.CharField(required=True)
     new_password = serializers.CharField(required=True)
+    confirm_password = serializers.CharField(required=True)
 
     def validate_old_password(self, value):
         user = self.context['request'].user
@@ -90,10 +91,18 @@ class ChangePasswordSerializer(serializers.Serializer):
         validate_password(value)
         return value
 
+    def validate_confirm_password(self, value):
+        data = self.get_initial()
+        new_password = data.get('new_password')
+        if value != new_password:
+            raise serializers.ValidationError("Passwords do not match")
+        return value
+
     def create(self, validated_data):
         user = self.context['request'].user
         old_password = validated_data['old_password']
         new_password = validated_data['new_password']
+        confirm_password = validated_data['confirm_password']
         if old_password == new_password:
             raise serializers.ValidationError("New password should be different from the old one.")
         user.set_password(new_password)

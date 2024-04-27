@@ -1,3 +1,4 @@
+import os
 from datetime import datetime, timedelta
 
 import pytz
@@ -5,12 +6,24 @@ from django.conf import settings
 from django.db import transaction
 from django.db.models import Q, Prefetch
 from django.shortcuts import get_object_or_404
-from rest_framework.decorators import api_view, permission_classes
+from dotenv import load_dotenv
+from drf_yasg import openapi
+from drf_yasg.utils import swagger_auto_schema
+from rest_framework.decorators import api_view, permission_classes, schema
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from .models import Booking, Office, Room, Seat
 from .serializers import OfficeSerializer, RoomSerializer, SeatSerializer, BookingSerializer, BookingHistorySerializer
+from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample, OpenApiResponse
+
+load_dotenv()
+
+BOOKING_DURATION = int(os.getenv('BOOKING_DURATION'))
+END_OF_WORK_HOUR = int(os.getenv('END_OF_WORK_HOUR')) - 1
+START_OF_WORK_HOUR = int(os.getenv('START_OF_WORK_HOUR'))
+START_OF_WORK_MINUTE = int(os.getenv('START_OF_WORK_MINUTE'))
+END_OF_WORK_MINUTE = int(os.getenv('END_OF_WORK_MINUTE'))
 
 
 class BaseViewSet(viewsets.ModelViewSet):
@@ -50,10 +63,19 @@ class SeatViewSet(BaseViewSet):
     queryset = Seat.objects.all()
     serializer_class = SeatSerializer
 
-
+@extend_schema(
+    request=BookingSerializer,
+    responses={
+        201: BookingSerializer,
+        400: {'type': 'object', 'properties': {'error': {'type': 'string'}}}
+    }
+)
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def create_booking(request):
+    """
+    Create a booking.
+    """
     user = request.user
     data = request.data.copy()
     server_timezone = pytz.timezone(settings.TIME_ZONE)
@@ -83,6 +105,14 @@ def has_conflicting_bookings(seat, start_time, end_time):
     return False
 
 
+@extend_schema(
+    request=None,
+    parameters=[
+        OpenApiParameter(name='booking_id', type=int, location=OpenApiParameter.QUERY, description='ID of the booking to cancel')
+    ],
+    responses={200: {'message': 'Booking cancelled successfully.'}},
+    methods=["POST"]
+)
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def cancel_booking(request):
@@ -96,7 +126,10 @@ def cancel_booking(request):
     else:
         return Response({'error': 'Invalid request method.'}, status=405)
 
-
+@extend_schema(
+    responses={200: BookingSerializer(many=True)},
+    description='Get list of bookings for the authenticated user.'
+)
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def list_my_bookings(request):
@@ -106,7 +139,10 @@ def list_my_bookings(request):
     serializer = BookingSerializer(bookings, many=True)
     return Response(serializer.data)
 
-
+@extend_schema(
+    responses={200: BookingHistorySerializer(many=True)},
+    description='Get booking history for the authenticated user.'
+)
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def booking_history(request):
@@ -116,7 +152,32 @@ def booking_history(request):
     serializer = BookingHistorySerializer(bookings, many=True)
     return Response(serializer.data)
 
-
+@extend_schema(
+    parameters=[
+        OpenApiParameter(name='date', type=str, location=OpenApiParameter.QUERY, description='Date of the booking in format YYYY-MM-DD'),
+        OpenApiParameter(name='room_id', type=int, location=OpenApiParameter.QUERY, description='ID of the room to check available seats'),
+    ],
+    description='Get available seats for a specific date and room.',
+    responses={
+        200: OpenApiResponse(
+            description='Response when seats are available',
+            examples=[
+                OpenApiExample(
+                    name='Available seats example',
+                    summary='Example of available seats response',
+                    description='Response when seats are available',
+                    value={
+                        "date": "2024-04-30",
+                        "available_times_by_seat": {
+                            "1": [("09:00", "10:00"), ("10:30", "11:30")],
+                            "2": [("09:00", "10:00"), ("10:30", "11:30")],
+                        }
+                    }
+                )
+            ]
+        )
+    }
+)
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def available_seats(request):
@@ -158,15 +219,15 @@ def available_seats(request):
     for seat in seats.all():
         bookings_on_date = seat.booking_set.all()
         available_times = []
-        interval_start = start_of_day.replace(hour=8, minute=0)
+        interval_start = start_of_day.replace(hour=START_OF_WORK_HOUR, minute=START_OF_WORK_MINUTE)
 
         # Adjust interval start time if the selected date is the current date
         if selected_date == current_time.date():
             interval_start = max(interval_start,
-                                 current_time.replace(minute=0) + timedelta(hours=1))
+                                 current_time.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1))
 
-        while interval_start <= end_of_day.replace(hour=20, minute=0):
-            interval_end = interval_start + timedelta(hours=1)
+        while interval_start <= end_of_day.replace(hour=END_OF_WORK_HOUR, minute=END_OF_WORK_MINUTE):
+            interval_end = interval_start + timedelta(hours=BOOKING_DURATION)
             # Check if the interval overlaps with any existing bookings
             overlapping_bookings = bookings_on_date.filter(
                 Q(start_time__lt=interval_end, end_time__gt=interval_start) |
@@ -174,8 +235,7 @@ def available_seats(request):
             )
             if not overlapping_bookings.exists():
                 available_times.append((interval_start.strftime('%H:%M'), interval_end.strftime('%H:%M')))
-
-            interval_start += timedelta(hours=1)
+            interval_start += timedelta(hours=BOOKING_DURATION)
 
         available_times_by_seat[seat.id] = available_times
 

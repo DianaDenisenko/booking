@@ -14,7 +14,7 @@ SECRET_KEY = 'django-insecure-dj=t@-i8fu0)s-#=8=k(j$aoe%j5s+38-k@gf!hy0vvx)vzo#a
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 # Application definition
 
@@ -25,6 +25,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'drf_spectacular',
     'authenticate',
     'booking',
 ]
@@ -44,7 +45,8 @@ REST_FRAMEWORK = {
     ),
     'DEFAULT_RENDERER_CLASSES': (
         'rest_framework.renderers.JSONRenderer',
-    )
+    ),
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
 ROOT_URLCONF = 'order_proj.urls'
 
@@ -72,8 +74,8 @@ WSGI_APPLICATION = 'order_proj.wsgi.application'
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "HOST": "localhost",
-        "PORT": 54321,
+        "HOST": "db",
+        "PORT": 5432,
         "USER": "admin",
         "PASSWORD": "123123",
         "NAME": "db01",
@@ -113,7 +115,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 
 STATIC_URL = 'static/'
-
+STATIC_ROOT = BASE_DIR / 'static/'
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 

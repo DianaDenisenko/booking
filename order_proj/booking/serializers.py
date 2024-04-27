@@ -1,11 +1,18 @@
 from datetime import datetime
-
+import os
+from dotenv import load_dotenv
 import pytz
 from django.conf import settings
 from pytz import timezone
 from rest_framework import serializers
 
 from .models import Office, Room, Seat, Booking
+
+
+load_dotenv()
+
+MIN_BOOKING_DURATION = float(os.getenv('MIN_BOOKING_DURATION'))
+MAX_BOOKING_DURATION = float(os.getenv('MAX_BOOKING_DURATION'))
 
 
 class OfficeSerializer(serializers.ModelSerializer):
@@ -26,9 +33,6 @@ class SeatSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-
-
-
 class BookingSerializer(serializers.ModelSerializer):
     class Meta:
         model = Booking
@@ -44,15 +48,14 @@ class BookingSerializer(serializers.ModelSerializer):
         print(current_time)
         if start_time < current_time:
             raise serializers.ValidationError("Cannot book in the past.")
-
-        if (end_time - start_time).total_seconds() > 7 * 24 * 3600:  # 7 days
+        print(MAX_BOOKING_DURATION)
+        if (end_time - start_time).total_seconds() > MAX_BOOKING_DURATION:
             raise serializers.ValidationError("Booking duration exceeds limit.")
 
-        if (end_time - start_time).total_seconds() < 60 * 60:  # 60 minutes
+        if (end_time - start_time).total_seconds() < MIN_BOOKING_DURATION:
             raise serializers.ValidationError("Can be booked for a minimum of 1 hour.")
 
         return data
-
 
 
 class BookingHistorySerializer(serializers.ModelSerializer):
