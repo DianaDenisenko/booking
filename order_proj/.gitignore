@@ -1,5 +1,2 @@
-# Ignore everything
-*
-
-# Except Python files
-!*.py
+*.pyc
+__pycache__/
