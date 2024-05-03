@@ -22,12 +22,6 @@ from drf_spectacular.utils import (
     OpenApiResponse,
 )
 
-BOOKING_DURATION = settings.BOOKING_DURATION
-END_OF_WORK_HOUR = settings.END_OF_WORK_HOUR
-START_OF_WORK_HOUR = settings.START_OF_WORK_HOUR
-START_OF_WORK_MINUTE = settings.START_OF_WORK_MINUTE
-END_OF_WORK_MINUTE = settings.END_OF_WORK_MINUTE
-
 
 class BaseViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAdminUser]
