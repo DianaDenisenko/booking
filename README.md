@@ -1,4 +1,4 @@
-# Description
+# Description (Django REST API)
 
 This application is an API for booking office workspaces. It allows users to register, authenticate, and book available office spaces.
 
