@@ -1,9 +1,7 @@
-from django.conf import settings
 from django.shortcuts import get_object_or_404
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, pagination
 from rest_framework.response import Response
 
 from .models import Booking, Office, Room, Seat
@@ -23,8 +21,15 @@ from drf_spectacular.utils import (
 )
 
 
+class CustomPagination(pagination.PageNumberPagination):
+    page_size = 10
+    page_size_query_param = "page_size"
+    max_page_size = 100
+
+
 class BaseViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAdminUser]
+    pagination_class = CustomPagination
 
     def get_permissions(self):
         if self.action == "list" or self.action == "retrieve":
@@ -166,24 +171,12 @@ def booking_history(request):
             seat_id=data["seat_id"], date=data["date"], user=user
         )
         serializer = BookingSerializer(bookings, many=True)
-        return Response(serializer.data)
+        return Response(serializer.data, status=status.HTTP_200_OK)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-class AvailableSeatsPagination(PageNumberPagination):
-    page_size = 26
-    page_size_query_param = "page_size"
-    max_page_size = 1000
 
 
 @extend_schema(
     parameters=[
-        OpenApiParameter(
-            name="page",
-            type=int,
-            location=OpenApiParameter.QUERY,
-            description="Page number of the paginator",
-        ),
         OpenApiParameter(
             name="room_id",
             type=int,
@@ -198,9 +191,7 @@ class AvailableSeatsPagination(PageNumberPagination):
         ),
     ],
     responses={
-        200: AvailableSeatsResponseSerializer,
-        404: OpenApiResponse(description="{}"),
-        400: OpenApiResponse(description="Bad request."),
+        200: AvailableSeatsResponseSerializer(many=True),
     },
 )
 @api_view(["GET"])
@@ -212,35 +203,10 @@ def available_seats(request):
 
     date = serializer.validated_data["date"]
     room_id = serializer.validated_data["room_id"]
-    seats = Seat.objects.filter(room=room_id)
 
-    if not seats.exists():
-        return Response({}, status=status.HTTP_404_NOT_FOUND)
-
-    available_times_by_seat = {
-        seat.id: seat.get_available_times(date) for seat in seats
-    }
-    list_of_tuples = [
-        (seat_id, time)
-        for seat_id, times in available_times_by_seat.items()
-        for time in times
-    ]
-
-    paginator = AvailableSeatsPagination()
-    paginated_list = paginator.paginate_queryset(list_of_tuples, request)
-
-    paginated_available_times_by_seat = {}
-    for seat_id, time in paginated_list:
-        paginated_available_times_by_seat.setdefault(seat_id, []).append(time)
-
+    available_times_by_seat = Seat.get_available_seats(date, room_id)
     response_data = {
         "date": date,
-        "pagination": paginator.get_paginated_response(
-            paginated_available_times_by_seat
-        ).data,
+        "time_by_seat": available_times_by_seat,
     }
-    response_serializer = AvailableSeatsResponseSerializer(data=response_data)
-    if response_serializer.is_valid():
-        return Response(response_serializer.validated_data, status=status.HTTP_200_OK)
-    else:
-        return Response(response_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    return Response(response_data, status=status.HTTP_200_OK)

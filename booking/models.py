@@ -53,44 +53,44 @@ class Seat(SoftDeleteModel):
     room = models.ForeignKey(Room, on_delete=models.CASCADE)
     number = models.IntegerField()
 
-    def get_available_times(self, date):
+    @staticmethod
+    def get_available_seats(date, room_id):
         timezone.activate(timezone.get_current_timezone())
 
         start_of_day = datetime.combine(date, datetime.min.time())
         start_of_day = timezone.make_aware(start_of_day)
-        interval_start = max(
-            start_of_day.replace(hour=START_OF_WORK_HOUR),
-            timezone.localtime(timezone.now()).replace(
-                minute=0, second=0, microsecond=0
-            )
-            + timedelta(hours=1),
-        )
-        end_of_day = start_of_day + timedelta(days=1) - timedelta(seconds=1)
 
+        seats = Seat.objects.filter(room=room_id)
         bookings = Booking.objects.filter(is_active=True)
+        available_times_by_seat = {}
+        for seat in seats:
+            interval_start = max(
+                start_of_day.replace(hour=START_OF_WORK_HOUR),
+                timezone.localtime(timezone.now()).replace(
+                    minute=0, second=0, microsecond=0
+                )
+                + timedelta(hours=1),
+            )
+            end_of_day = start_of_day + timedelta(days=1) - timedelta(seconds=1)
+            available_times = []
+            while interval_start <= end_of_day.replace(hour=END_OF_WORK_HOUR, minute=0):
+                interval_end = interval_start + timedelta(hours=BOOKING_DURATION)
 
-        available_times = []
-
-        while interval_start <= end_of_day.replace(hour=END_OF_WORK_HOUR, minute=0):
-            interval_end = interval_start + timedelta(hours=BOOKING_DURATION)
-
-            has_conflict = False
-            for booking in bookings:
-                if (
+                if not any(
                     interval_start < booking.end_time
                     and interval_end > booking.start_time
+                    and booking.seat == seat
+                    for booking in bookings
                 ):
-                    has_conflict = True
-                    break
-
-            if not has_conflict:
-                available_times.append(
-                    (interval_start.strftime("%H:%M"), interval_end.strftime("%H:%M"))
-                )
-
-            interval_start += timedelta(hours=BOOKING_DURATION)
-
-        return available_times
+                    available_times.append(
+                        (
+                            interval_start.strftime("%H:%M"),
+                            interval_end.strftime("%H:%M"),
+                        )
+                    )
+                interval_start += timedelta(hours=BOOKING_DURATION)
+            available_times_by_seat[seat.id] = available_times
+        return available_times_by_seat
 
 
 class BookingManager(models.Manager):

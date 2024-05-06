@@ -68,7 +68,6 @@ class BookingHistorySerializer(serializers.Serializer):
 class AvailableSeatsSerializer(serializers.Serializer):
     date = serializers.DateField()
     room_id = serializers.IntegerField()
-    page = serializers.IntegerField()
 
     def validate_date(self, value):
         server_timezone = pytz.timezone(settings.TIME_ZONE)
@@ -92,12 +91,6 @@ class AvailableSeatsSerializer(serializers.Serializer):
 
 class AvailableSeatsResponseSerializer(serializers.Serializer):
     date = serializers.DateField()
-    pagination = serializers.DictField()
-
-    @staticmethod
-    def format_response_data(cls, date, paginated_list):
-        paginated_available_times_by_seat = {}
-        for seat_id, time in paginated_list:
-            paginated_available_times_by_seat.setdefault(seat_id, []).append(time)
-
-        return {"date": date, "pagination": paginated_available_times_by_seat}
+    available_times_by_seat = serializers.DictField(
+        child=serializers.ListField(child=serializers.CharField())
+    )
