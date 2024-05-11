@@ -94,10 +94,6 @@ class Seat(SoftDeleteModel):
 
 
 class BookingManager(models.Manager):
-    def update_expired_bookings(self):
-        expired_bookings = self.filter(end_time__lt=timezone.now(), is_active=True)
-        expired_bookings.update(is_active=False)
-
     def has_conflicting_bookings(self, seat, start_time, end_time):
         overlaps_query = Q(start_time__lt=end_time, end_time__gt=start_time)
         conflicting_bookings = self.filter(seat=seat, is_active=True).filter(

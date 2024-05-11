@@ -13,14 +13,6 @@ class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
     def get_token(cls, user):
         token = super().get_token(user)
         token["username"] = user.username
-        current_time = datetime.utcnow()
-        if token["exp"] < current_time.timestamp():
-            refresh = RefreshToken.for_user(user)
-            return {
-                "access": str(token),
-                "refresh": str(refresh),
-            }
-
         return token
 
 
@@ -28,7 +20,6 @@ class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(
         write_only=True, required=True, validators=[validate_password]
     )
-    password2 = serializers.CharField(write_only=True, required=True)
     email = serializers.EmailField(
         required=True, validators=[UniqueValidator(queryset=CustomUser.objects.all())]
     )
@@ -51,17 +42,12 @@ class RegisterSerializer(serializers.ModelSerializer):
             "username",
             "email",
             "password",
-            "password2",
             "first_name",
             "last_name",
             "date_of_birth",
         )
 
     def validate(self, attrs):
-        if attrs["password"] != attrs["password2"]:
-            raise serializers.ValidationError(
-                {"password": "Password fields didn't match."}
-            )
         if "first_name" in attrs:
             attrs["first_name"] = self.validate_name(attrs["first_name"])
 
@@ -90,35 +76,27 @@ class RegisterSerializer(serializers.ModelSerializer):
 class ChangePasswordSerializer(serializers.Serializer):
     old_password = serializers.CharField(required=True)
     new_password = serializers.CharField(required=True)
-    confirm_password = serializers.CharField(required=True)
 
-    def validate_old_password(self, value):
+    def validate(self, attrs):
         user = self.context["request"].user
-        if not user.check_password(value):
+        old_password = attrs.get("old_password")
+        new_password = attrs.get("new_password")
+
+        if not user.check_password(old_password):
             raise serializers.ValidationError("Invalid old password")
-        return value
 
-    def validate_new_password(self, value):
-        validate_password(value)
-        return value
-
-    def validate_confirm_password(self, value):
-        data = self.get_initial()
-        new_password = data.get("new_password")
-        if value != new_password:
-            raise serializers.ValidationError("Passwords do not match")
-        return value
-
-    def create(self, validated_data):
-        user = self.context["request"].user
-        old_password = validated_data["old_password"]
-        new_password = validated_data["new_password"]
-        confirm_password = validated_data["confirm_password"]
         if old_password == new_password:
             raise serializers.ValidationError(
                 "New password should be different from the old one."
             )
-        user.set_password(new_password)
+
+        validate_password(new_password)
+
+        return attrs
+
+    def create(self, validated_data):
+        user = self.context["request"].user
+        user.set_password(validated_data["new_password"])
         user.save()
         return user
 

@@ -41,7 +41,7 @@ class RegisterView(generics.CreateAPIView):
 @permission_classes([IsAuthenticated])
 def change_password(request):
     serializer = ChangePasswordSerializer(
-        data=request.data, context={"request": request}
+        data=request.data, context={"request": request}, instance=request.user
     )
     if serializer.is_valid():
         serializer.save()

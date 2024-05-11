@@ -33,14 +33,11 @@ class BookingSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         server_timezone = pytz.timezone(settings.TIME_ZONE)
-        user = self.context["request"].user
-        data["user"] = user.pk
-        data["start_time"] = data["start_time"]
-        data["end_time"] = data["end_time"]
 
         current_time = server_timezone.localize(datetime.now())
         start_time = data["start_time"]
         end_time = data["end_time"]
+
         if start_time < current_time:
             raise serializers.ValidationError("Cannot book in the past.")
         if (end_time - start_time).total_seconds() > MAX_BOOKING_DURATION:
@@ -55,6 +52,7 @@ class BookingSerializer(serializers.ModelSerializer):
 class BookingHistorySerializer(serializers.Serializer):
     date = serializers.DateField()
     seat_id = serializers.IntegerField()
+    user_id = serializers.IntegerField()
 
     def validate(self, data):
         try:
