@@ -90,5 +90,9 @@ class AvailableSeatsSerializer(serializers.Serializer):
 class AvailableSeatsResponseSerializer(serializers.Serializer):
     date = serializers.DateField()
     available_times_by_seat = serializers.DictField(
-        child=serializers.ListField(child=serializers.CharField())
+        child=serializers.ListField(
+            child=serializers.ListField(
+                child=serializers.CharField(), min_length=2, max_length=2
+            )
+        )
     )

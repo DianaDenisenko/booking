@@ -18,6 +18,7 @@ from drf_spectacular.utils import (
     extend_schema,
     OpenApiParameter,
     OpenApiResponse,
+    OpenApiExample,
 )
 
 
@@ -204,6 +205,18 @@ def booking_history(request):
     responses={
         200: AvailableSeatsResponseSerializer(many=True),
     },
+    examples=[
+        OpenApiExample(
+            name="example",
+            value={
+                "date": "2024-05-11",
+                "available_times_by_seat": {
+                    "1": [["13:00", "14:00"], ["14:00", "15:00"]],
+                    "2": [["12:00", "13:00"], ["14:00", "15:00"]],
+                },
+            },
+        ),
+    ],
 )
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
